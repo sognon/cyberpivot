@@ -1,0 +1,31 @@
+title: ISO/IEC 42001
+version: "2024"
+domains:
+  - name: Gouvernance IA
+    controls:
+      - id: GOV-1
+        item: Politique IA
+        question: Existe-t-il une politique IA approuvée et diffusée ?
+        objective: Définir le cadre et les responsabilités.
+        evidence: Politique signée, date, périmètre.
+        reference: ISO 42001 §5
+        criterion: Politique approuvée, rôles assignés.
+        recommendation: Rédiger/mettre à jour la politique IA.
+      - id: GOV-2
+        item: Comité IA
+        question: Un comité IA supervisant les risques est-il en place ?
+        objective: Gouvernance et supervision des risques IA.
+        evidence: PV de réunion, charte du comité.
+        reference: ISO 42001 §5
+        criterion: Réunions régulières, quorum.
+        recommendation: Instituer un comité IA avec feuille de route.
+  - name: Gestion des risques IA
+    controls:
+      - id: RSK-1
+        item: Méthode risques IA
+        question: La méthode de gestion des risques IA est-elle définie et appliquée ?
+        objective: Identifier et traiter les risques IA.
+        evidence: Méthode documentée, registre des risques.
+        reference: ISO 42001 §6
+        criterion: Méthode approuvée, revue annuelle.
+        recommendation: Formaliser la méthode et maintenir le registre.

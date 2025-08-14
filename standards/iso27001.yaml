@@ -1,0 +1,23 @@
+title: ISO/IEC 27001
+version: "2022"
+domains:
+  - name: Organisation de la sécurité
+    controls:
+      - id: A.5.1
+        item: Politique de sécurité
+        question: Les politiques de sécurité sont-elles définies et communiquées ?
+        objective: Cadre et orientations sécurité.
+        evidence: Politique approuvée, communication.
+        reference: ISO 27001 §5
+        criterion: Existence, validité, diffusion.
+        recommendation: Mettre à jour la politique et communiquer.
+  - name: Gestion des actifs
+    controls:
+      - id: A.5.9
+        item: Inventaire des actifs
+        question: Un inventaire des actifs est-il maintenu à jour ?
+        objective: Connaissance et maîtrise du périmètre.
+        evidence: Inventaire, responsables, classification.
+        reference: ISO 27001 Annexe A
+        criterion: Complet, à jour, assignations.
+        recommendation: Mettre en place un inventaire centralisé.

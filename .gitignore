@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+cyberpivot.db
+standards/cache/
+evidence/
+*.zip
+*.docx
+*.xlsx
+*.pdf
+key
+key.pub
