@@ -1,0 +1,15 @@
+streamlit>=1.37
+pandas>=2.2
+pyyaml>=6.0
+cryptography>=42.0
+requests>=2.32
+
+# Base de données
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9
+
+# Blockchain
+web3>=6.0
+
+# Visualisation
+matplotlib>=3.9
