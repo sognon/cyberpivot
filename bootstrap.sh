@@ -1,47 +1,80 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ---- Dépendances système minimales (si venv indisponible) ----
-# Sur Kali/Debian/Ubuntu il faut le module venv :
-if ! python3 -c "import venv" >/dev/null 2>&1; then
-  echo "[BOOTSTRAP] Le module venv n'est pas installé. Installation (sudo requise)…"
-  if command -v apt >/dev/null 2>&1; then
-    # Essaie d'installer le paquet venv (nom générique)
-    sudo apt update
-    sudo apt install -y python3-venv
-  else
-    echo "[BOOTSTRAP] Installe manuellement le module venv pour Python (ex: apt install python3-venv)."
-    exit 1
-  fi
+# --- Aller dans le dossier du script
+cd "$(dirname "$0")"
+
+echo "== CyberPivot bootstrap =="
+echo "Dossier: $(pwd)"
+
+# --- Activer le venv s'il existe
+if [ -f ".venv/bin/activate" ]; then
+  echo "Activation du venv .venv ..."
+  # shellcheck disable=SC1091
+  source ".venv/bin/activate"
+  pip install matplotlib numpy
+  pip install passlib[bcrypt]
+else
+  echo "⚠️ Aucun venv .venv détecté (ok mais tu dois avoir streamlit installé globalement)."
 fi
 
-echo "[BOOTSTRAP] Création des dossiers…"
-mkdir -p standards evidences reports uploads
+# --- Initialisation DB (auth + storage)
+echo "== Initialisation des bases =="
 
-# ---- Création/activation du virtualenv local .venv ----
-if [ ! -d ".venv" ]; then
-  echo "[BOOTSTRAP] Création du virtualenv local (.venv)…"
-  python3 -m venv .venv
-fi
+set +e
+python - <<'PY'
+import sys, traceback
 
-# Utilise le pip du venv
-VENV_PY=".venv/bin/python"
-VENV_PIP=".venv/bin/pip"
+def log(msg: str):
+    print(msg, flush=True)
 
-echo "[BOOTSTRAP] Mise à jour de pip dans le venv…"
-$VENV_PY -m pip install --upgrade pip
+ok = True
+try:
+    import bootstrap
+    log("• bootstrap.py détecté → bootstrap.init_app_db()")
+    res = bootstrap.init_app_db()
+    ok = bool(res)
+except Exception as e:
+    log(f"! Import bootstrap échoué: {e}")
+    log("→ Fallback: init direct via auth/storage")
+    try:
+        import auth, storage
 
-echo "[BOOTSTRAP] Installation des dépendances dans le venv…"
-$VENV_PIP install -r requirements.txt
+        if hasattr(auth, 'init_auth_db'):
+            auth.init_auth_db()
+            log("  - auth.init_auth_db() OK")
+        else:
+            log("  - auth.init_auth_db() introuvable (ignoré)")
 
-echo "[BOOTSTRAP] Initialisation DB & comptes…"
-$VENV_PY - <<'PY'
-import auth
-from app_cyberpivot import init_app_db
-init_app_db()
-auth.init_auth_db()
-print("[BOOTSTRAP] DB initialisée. Admin par défaut : admin@cyberpivot.local / admin123")
+        if hasattr(storage, 'init_db'):
+            storage.init_db()
+            log("  - storage.init_db() OK")
+        else:
+            log("  - storage.init_db() introuvable (ignoré)")
+
+    except Exception as e4:
+        ok = False
+        log(f"!! Import auth/storage échoué: {e4}")
+        traceback.print_exc()
+
+if ok:
+    log("✅ Initialisation terminée SANS erreur.")
+    sys.exit(0)
+else:
+    log("⚠️ Initialisation terminée AVEC erreurs.")
+    sys.exit(1)
 PY
+rc=$?
+set -e
 
-echo "[BOOTSTRAP] Terminé ✅"
+if [ $rc -eq 0 ]; then
+  echo "== ✅ bootstrap OK"
+else
+  echo "== ⚠️ bootstrap en erreur (code $rc)"
+fi
+
+# --- Lancer Streamlit
+echo "== Lancement de l'app Streamlit =="
+exec streamlit run app_cyberpivot.py
+
 
