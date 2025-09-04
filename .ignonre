@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite
+.env
+.venv/
+dist/
+build/
+.git/
+.gitignore
+.streamlit/cache/
+.streamlit/secrets.toml
+node_modules/
+

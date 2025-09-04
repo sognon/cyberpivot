@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+
+# App data
+cyberpivot.db
+evidences/
+uploads/
+reports/
+standards/*.xlsx
+*.tmp
+*.log
+
+# Streamlit
+.streamlit/
+
