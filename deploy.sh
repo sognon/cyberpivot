@@ -1,107 +1,87 @@
-#!/usr/bin/env bash
-set -e
-
-# ====== CONFIG ======
-# Nom du module principal Streamlit (sans .py). Si ton fichier s'appelle 'streamlit_app.py',
-# mets APP_MODULE="streamlit_app"
-APP_MODULE="${APP_MODULE:-app}"
-
-# URL SSH du dépôt
-REMOTE_SSH="git@github.com:sognon/cyberpivot.git"
-
-echo "➡️  Déploiement CyberPivot (avec bootstrap2.sh) — module: ${APP_MODULE}.py"
-
-# 0) Aller à la racine du repo (même si lancé depuis un sous-dossier)
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-
-# 1) Générer une clé SSH si absente
-if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
-  echo "🔑 Génération d'une clé SSH (ed25519)"
-  ssh-keygen -t ed25519 -C "ton_email_github" -N "" -f "$HOME/.ssh/id_ed25519"
-  eval "$(ssh-agent -s)"
-  ssh-add "$HOME/.ssh/id_ed25519"
-  echo "👉 Copie cette clé publique dans GitHub (Settings → SSH and GPG keys → New SSH key):"
-  echo "--------------------------------------------------------------------------"
-  cat "$HOME/.ssh/id_ed25519.pub"
-  echo "--------------------------------------------------------------------------"
-  read -p "Appuie sur Entrée après avoir ajouté la clé sur GitHub… " _
-else
-  eval "$(ssh-agent -s)" >/dev/null
-  ssh-add "$HOME/.ssh/id_ed25519" >/dev/null 2>&1 || true
-fi
-
-# 2) Bascule le remote en SSH
-if git remote | grep -q "^origin$"; then
-  git remote set-url origin "$REMOTE_SSH"
-else
-  git remote add origin "$REMOTE_SSH"
-fi
-
-# 3) Créer/mettre à jour main.py — lance bootstrap2.sh puis ton app
-cat > main.py <<'PY'
-import os, subprocess
+#!/usr/bin/env python3
+import subprocess as sp, os
 from pathlib import Path
-import importlib
-import streamlit as st
+from textwrap import dedent
 
+HERE = Path.cwd()
+
+MAIN_PY = dedent("""
+import os, importlib, streamlit as st
 st.set_page_config(page_title="CyberPivot™", page_icon="🛡️", layout="wide")
+try:
+    from cloud_bootstrap import run_bootstrap
+    st.caption(run_bootstrap())
+except Exception as e:
+    st.warning(f"Bootstrap non exécuté: {e}")
+mod = importlib.import_module("main.app_cyberpivot")
+if hasattr(mod, "main") and callable(mod.main):
+    mod.main()
+""").strip()
+
+CLOUD_BOOTSTRAP_PY = dedent("""
+import os, shutil, tarfile, zipfile
+from pathlib import Path
+import streamlit as st, requests
 
 @st.cache_resource(show_spinner=True)
-def run_bootstrap():
-    # Exécute bootstrap2.sh s'il existe (sans sudo/apt)
-    script = Path(__file__).parent / "bootstrap2.sh"
-    if not script.exists():
-        return "bootstrap: absent (ok)"
+def run_bootstrap() -> str:
+    Path("data").mkdir(parents=True, exist_ok=True)
+    Path("models").mkdir(parents=True, exist_ok=True)
+    # Exemple: download_file("https://exemple.com/model.bin", "models/model.bin")
+    return "bootstrap cloud: OK ✅"
+
+def download_file(url: str, dst: str, timeout: int = 60):
+    dst_path = Path(dst); dst_path.parent.mkdir(parents=True, exist_ok=True)
+    if dst_path.exists() and dst_path.stat().st_size > 0: return
+    r = requests.get(url, stream=True, timeout=timeout); r.raise_for_status()
+    with open(dst_path, "wb") as f: shutil.copyfileobj(r.raw, f)
+""").strip()
+
+def run(cmd):
+    print(">", " ".join(cmd))
+    sp.run(cmd, check=True)
+
+if __name__ == "__main__":
+    # 1) Écrire main.py + cloud_bootstrap.py
+    (HERE/"main.py").write_text(MAIN_PY, encoding="utf-8")
+    (HERE/"cloud_bootstrap.py").write_text(CLOUD_BOOTSTRAP_PY, encoding="utf-8")
+
+    # 2) Déps min
+    req = HERE/"requirements.txt"
+    if not req.exists():
+        req.write_text("streamlit\nrequests\n", encoding="utf-8")
+    else:
+        txt = req.read_text(encoding="utf-8")
+        add = []
+        if "streamlit" not in txt: add.append("streamlit")
+        if "requests" not in txt: add.append("requests")
+        if add: req.write_text(txt.rstrip()+"\n"+"\n".join(add)+"\n", encoding="utf-8")
+
+    # 3) Git init + branche main
+    if not (HERE/".git").exists():
+        run(["git","init"])
+    run(["git","checkout","-B","main"])
+
+    # 4) Config remote
+    remotes = sp.check_output(["git","remote"], text=True).split()
+    if "origin" in remotes:
+        run(["git","remote","set-url","origin","git@github.com:sognon/cyberpivot.git"])
+    else:
+        run(["git","remote","add","origin","git@github.com:sognon/cyberpivot.git"])
+
+    # 5) Commit + push
+    run(["git","add","-A"])
     try:
-        os.chmod(script, 0o755)
-    except Exception:
-        pass
-    res = subprocess.run(
-        ["/bin/bash", str(script)],
-        capture_output=True, text=True
-    )
-    with st.expander("Logs bootstrap2.sh", expanded=False):
-        st.code(res.stdout or "(no stdout)")
-        if res.stderr:
-            st.code("STDERR:\n" + res.stderr)
-    if res.returncode != 0:
-        st.error("bootstrap2.sh a échoué — adapte-le (pip -> requirements.txt, apt -> packages.txt).")
-        st.stop()
-    return "bootstrap: exécuté ✅"
+        run(["git","commit","-m","Deploy: entrypoint (app_cyberpivot) + cloud bootstrap"])
+    except sp.CalledProcessError:
+        print("• Rien à committer (ok)")
+    run(["git","push","--force","--set-upstream","origin","main"])
 
-msg = run_bootstrap()
-st.write(msg)
+    print("\n✅ Poussé sur sognon/cyberpivot (branche main).")
+    print("➡️ Sur Streamlit Cloud, configure:")
+    print("   • Repository: sognon/cyberpivot")
+    print("   • Branch: main")
+    print("   • Main file path: main.py")
+    print("\n🌐 App publique: https://cyberpivot.streamlit.app/")
 
-# Lancer le module principal (défini via variable d'env APP_MODULE, sinon 'app')
-APP_MODULE = os.getenv("APP_MODULE", "app")
-try:
-    mod = importlib.import_module(APP_MODULE)
-    if hasattr(mod, "main") and callable(mod.main):
-        mod.main()
-except Exception as e:
-    st.error(f"Erreur en important {APP_MODULE}.py : {e}")
-    st.info("Tu peux changer APP_MODULE dans les Settings Streamlit (env) ou modifier main.py.")
-PY
-
-# 4) S'assurer que requirements.txt contient streamlit (et requests si besoin)
-grep -q "^streamlit" requirements.txt 2>/dev/null || echo "streamlit" >> requirements.txt
-# Si ton bootstrap télécharge des fichiers, requests est utile :
-grep -q "^requests" requirements.txt 2>/dev/null || echo "requests" >> requirements.txt
-
-# 5) Commit & push (branche main)
-git add -A
-git commit -m "Deploy: add main.py entrypoint with bootstrap2.sh runner" || echo "ℹ️ Rien à committer."
-git branch -M main
-git push --force --set-upstream origin main
-
-echo
-echo "✅ Push effectué sur 'main' via SSH."
-echo "👉 Sur Streamlit Cloud :"
-echo "   - New app (ou Manage app > Deployments) → repo sognon/cyberpivot, branche main"
-echo "   - Main file path : main.py"
-echo "   - (Optionnel) Variables : APP_MODULE=${APP_MODULE}"
-echo "   - Deploy"
-echo
-echo "🌐 App publique : https://cyberpivot.streamlit.app/"
-echo "💡 Si bootstrap2.sh utilise 'apt' ou 'sudo', déclare les paquets dans packages.txt plutôt."
 
