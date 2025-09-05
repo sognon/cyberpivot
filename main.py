@@ -1,4 +1,4 @@
-# main.py — Entrée Streamlit : run bootstrap.sh puis app_cyberpivot.py
+# main.py — Entrée Streamlit : lance bootstrap.sh puis l'app app_cyberpivot.py
 import os, subprocess
 from pathlib import Path
 import importlib
@@ -6,8 +6,8 @@ import streamlit as st
 
 st.set_page_config(page_title="CyberPivot™", page_icon="🛡️", layout="wide")
 
-# 1) Lancer bootstrap.sh (optionnel) et afficher les logs
-script = Path(__file__).parent / "bootstrap.sh"   # renomme si ton script est bootstrap2.sh
+# 1) Bootstrap (optionnel) — exécuter le script shell et afficher les logs
+script = Path(__file__).parent / "bootstrap.sh"
 if script.exists():
     try:
         os.chmod(script, 0o755)
@@ -19,13 +19,12 @@ if script.exists():
         if res.stderr:
             st.code("STDERR:\n" + res.stderr)
     if res.returncode != 0:
-        st.error("bootstrap.sh a échoué — convertis tes 'apt' en packages.txt et tes 'pip' en requirements.txt.")
+        st.error("bootstrap.sh a échoué — mets les 'pip' dans requirements.txt, les 'apt' dans packages.txt, et les secrets dans Settings → Secrets.")
         st.stop()
 else:
-    st.caption("bootstrap.sh introuvable (ok si tout est déjà préparé).")
+    st.caption("bootstrap.sh introuvable (ok si tout est déjà prêt).")
 
-# 2) Importer et lancer l'app principale (racine) : app_cyberpivot.py
+# 2) Importer et lancer l'app principale
 mod = importlib.import_module("app_cyberpivot")
 if hasattr(mod, "main") and callable(mod.main):
     mod.main()
-
